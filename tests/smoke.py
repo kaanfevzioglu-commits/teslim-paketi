@@ -1,12 +1,22 @@
 """CI duman testi: gömülü ffmpeg ile gerçek işletim sisteminde uçtan uca işlem.
 Öz-test, ortasında çözünürlük değişen video, uzun hareketli video (komut uzunluğu),
 sessiz ses kanalı ve (Mac'te) Apple Vision."""
+import faulthandler
 import os
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+# Takılırsa her 5 dakikada bir, programın o an nerede beklediğini yazdır
+faulthandler.dump_traceback_later(300, repeat=True)
+T0 = time.time()
+
+
+def adim(msg):
+    print(f"[{time.time() - T0:6.1f} sn] {msg}", flush=True)
+
 
 ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / "build" / "bin"
@@ -16,13 +26,14 @@ TMP = Path(tempfile.mkdtemp(prefix="teslim_smoke_"))
 os.environ["TESLIM_OUT"] = str(TMP / "out")
 os.environ["TESLIM_DATA"] = str(TMP / "data")
 sys.path.insert(0, str(ROOT / "app"))
+adim("sunucu modülü yükleniyor")
 import server  # noqa: E402
 import takip  # noqa: E402
 
 FF = server.FFMPEG
 print("Teslim Paketi", server.VERSION, "| ffmpeg:", FF)
-print("zincir dosyası seçeneği:", repr(server.graph_file_option()))
-print("piksel altı öz-test:", server.subpixel_ok())
+adim("zincir dosyası seçeneği: " + repr(server.graph_file_option()))
+adim("piksel altı öz-test: " + str(server.subpixel_ok()))
 
 
 def ff(*args):
@@ -48,6 +59,7 @@ ff("-f", "lavfi", "-i", "gradients=s=1920x1080:d=30:speed=0.0001", "-f", "lavfi"
    "-map", "[v]", "-map", "2:a", "-t", "30", "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
    str(src / "uzun hareketli (sessiz ses).mp4"))
 
+adim("test videoları hazır")
 failed = False
 for fit in ("track", "blur"):
     jid = "smoke_" + fit
@@ -73,6 +85,7 @@ for fit in ("track", "blur"):
                    f"drawbox=x=iw/4:y=ih/2-20:w=iw/2:h=40:color=white@0.35:t=fill",
                    "-frames:v", "1", str(wm / f"wm_{pw}x{ph}.png"))
     t = time.time()
+    adim(f"{fit} işi başlıyor")
     server.process_job(jid, {"client": "Test Müşteri", "project": f"duman {fit}", "fit": fit, "preview": True,
                              "formats": fmts, "letterbox": fit == "blur"})
     job = server.JOBS[jid]

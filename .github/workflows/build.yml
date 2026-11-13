@@ -34,7 +34,8 @@ jobs:
       - name: OpenCV (özne tespiti)
         run: python -m pip install "opencv-contrib-python-headless==4.10.0.84" "numpy<2.3"
       - name: Duman testi (gerçek Windows)
-        run: python tests/smoke.py
+        timeout-minutes: 30
+        run: python -u tests/smoke.py
       - name: Uygulamayı derle
         run: |
           python -m pip install --upgrade pip pyinstaller
@@ -79,7 +80,8 @@ jobs:
       - name: Apple Vision bileşenini derle
         run: swiftc -O app/kadraj.swift -o build/bin/kadraj
       - name: Duman testi (gerçek macOS)
-        run: python tests/smoke.py
+        timeout-minutes: 30
+        run: python -u tests/smoke.py
       - name: Uygulamayı derle
         run: |
           python -m pip install --upgrade pip pyinstaller
