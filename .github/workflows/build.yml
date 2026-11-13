@@ -52,7 +52,7 @@ jobs:
 
   mac:
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -82,8 +82,10 @@ jobs:
           path: dist/TeslimPaketi-*-Mac.dmg
 
   surum:
-    # İki derleme de başarılıysa tek bir sürüm sayfası oluşturur (etiket: v<sürüm>)
+    # Başarılı olan derlemeleri tek bir sürüm sayfasına koyar (etiket: v<sürüm>).
+    # Mac kuyrukta kalsa bile Windows yayınlanır; Mac sonradan başarılı olunca eklenir.
     needs: [windows, mac]
+    if: always() && (needs.windows.result == 'success' || needs.mac.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +100,7 @@ jobs:
           name: Teslim Paketi ${{ env.VER }}
           target_commitish: ${{ github.sha }}
           make_latest: "true"
+          fail_on_unmatched_files: false
           files: |
             paket/TeslimPaketi-Windows/*
             paket/TeslimPaketi-Mac/*
