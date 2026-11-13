@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / "build" / "bin"
 os.environ["PATH"] = str(BIN) + os.pathsep + os.environ.get("PATH", "")
+os.environ["TESLIM_BIN"] = str(BIN)  # gömülü ffmpeg'i kullan
 TMP = Path(tempfile.mkdtemp(prefix="teslim_smoke_"))
 os.environ["TESLIM_OUT"] = str(TMP / "out")
 os.environ["TESLIM_DATA"] = str(TMP / "data")

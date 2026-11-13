@@ -27,7 +27,7 @@ APP_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
 
-VERSION = "2.1.1"
+VERSION = "2.1.2"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
@@ -44,7 +44,9 @@ WORK_ROOT = Path(tempfile.gettempdir()) / "teslim-paketi-gelen"
 PREFS_FILE = DATA_DIR / "ayarlar.json"
 TXT = {"text": True, "encoding": "utf-8", "errors": "replace"}  # Windows'ta Türkçe dosya adları için
 
-_extra = ["/opt/homebrew/bin", "/usr/local/bin", str(APP_DIR / "bin"), str(DATA_DIR / "bin")]
+# Önce uygulamayla gelen (gömülü) ffmpeg, sonra sistemdekiler
+_extra = [os.environ.get("TESLIM_BIN", ""), str(APP_DIR / "bin"), str(DATA_DIR / "bin"), "/opt/homebrew/bin", "/usr/local/bin"]
+_extra = [x for x in _extra if x]
 if IS_WIN:  # winget ile kurulan ffmpeg: Links klasörü ya da paket klasörü
     _la = Path(os.environ.get("LOCALAPPDATA", HOME / "AppData" / "Local"))
     _extra += [str(_la / "Microsoft" / "WinGet" / "Links")]

@@ -527,12 +527,20 @@ def track_expr(track, cut_idx, src_len, crop_len, fps, var="n", eps=0.15):
     for (t0, p0, _), (t1, p1, jump) in zip(knots, knots[1:]):
         if jump:                       # sahne geçişi: anında atla
             if abs(p1 - p0) >= 1e-3:
-                terms.append(f"{p1 - p0:+.3f}*gte({T},{t1:.4f})")
+                terms.append(f"({p1 - p0:.3f})*gte({T},{t1:.4f})")
             continue
         if abs(p1 - p0) < 1e-3 or t1 <= t0:
             continue
-        terms.append(f"{(p1 - p0) / (t1 - t0):+.4f}*clip({T}-{t0:.4f},0,{t1 - t0:.4f})")
-    return f"min({lim:.3f},max(0,{''.join(terms)}))"
+        terms.append(f"({(p1 - p0) / (t1 - t0):.4f})*clip({T}-{t0:.4f},0,{t1 - t0:.4f})")
+    return f"min({lim:.3f},max(0,{_grouped_sum(terms)}))"
+
+
+def _grouped_sum(terms, k=16):
+    """Uzun toplamı iç içe parantezli küçük gruplara böler.
+    ffmpeg 7+ tek zincirde ~100'den fazla terimi reddediyor ("Missing ')'")."""
+    while len(terms) > k:
+        terms = ["(" + "+".join(terms[i:i + k]) + ")" for i in range(0, len(terms), k)]
+    return "+".join(terms)
 
 
 def subpixel_graph(track, cut_idx, axis, src_w, src_h, crop_w, crop_h, fps, out_w, out_h, subpixel=True, eps=0.15):
