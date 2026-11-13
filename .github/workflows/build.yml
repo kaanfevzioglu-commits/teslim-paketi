@@ -1,0 +1,89 @@
+name: Derle
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sürüm
+        shell: bash
+        run: echo "VER=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/server.py',encoding='utf-8').read()).group(1))")" >> $GITHUB_ENV
+      - name: ffmpeg indir
+        run: python scripts/get_ffmpeg.py
+      - name: Duman testi (gerçek Windows)
+        run: python tests/smoke.py
+      - name: Uygulamayı derle
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python scripts/build.py
+      - name: Kurulum sihirbazı
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VER" packaging\windows\TeslimPaketi.iss
+          Compress-Archive -Path dist\TeslimPaketi -DestinationPath "dist\TeslimPaketi-Tasinabilir-$env:VER-Windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TeslimPaketi-Windows
+          path: |
+            dist/TeslimPaketi-Kurulum-*.exe
+            dist/TeslimPaketi-Tasinabilir-*.zip
+      - name: Sürüm sayfasına ekle
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/TeslimPaketi-Kurulum-*.exe
+            dist/TeslimPaketi-Tasinabilir-*.zip
+
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sürüm
+        run: echo "VER=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/server.py',encoding='utf-8').read()).group(1))")" >> $GITHUB_ENV
+      - name: ffmpeg indir
+        run: python scripts/get_ffmpeg.py
+      - name: Apple Vision bileşenini derle
+        run: swiftc -O app/kadraj.swift -o build/bin/kadraj
+      - name: Duman testi (gerçek macOS)
+        run: python tests/smoke.py
+      - name: Uygulamayı derle
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python scripts/build.py
+          APP="dist/Teslim Paketi.app"
+          plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
+          plutil -replace CFBundleShortVersionString -string "$VER" "$APP/Contents/Info.plist"
+          codesign --force --deep --sign - "$APP"
+          mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Applications
+          hdiutil create -volname "Teslim Paketi" -srcfolder dmg -ov -format UDZO "dist/TeslimPaketi-$VER-Mac.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TeslimPaketi-Mac
+          path: dist/TeslimPaketi-*-Mac.dmg
+      - name: Sürüm sayfasına ekle
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TeslimPaketi-*-Mac.dmg
