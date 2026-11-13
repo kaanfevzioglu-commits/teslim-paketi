@@ -58,8 +58,14 @@
   .empty p{color:var(--mute);margin:0 0 18px}
   .legend{display:flex;flex-wrap:wrap;gap:14px;color:var(--mute);font-size:12.5px;min-height:18px}
   .legend span{display:inline-flex;align-items:center;gap:6px}
-  .legend i{width:14px;height:0;border-top:2px solid var(--frame)}
+  .legend i{width:16px;height:0;border-top:2px solid var(--frame)}
   .legend i.dash{border-top-style:dashed}
+  .legend .same{color:#6f7682}
+  .monhint{position:absolute;left:0;right:0;bottom:12px;text-align:center;color:#c9ccd3;font-size:12.5px;pointer-events:none}
+  .monhint span{background:rgba(18,20,24,.72);padding:5px 10px;border-radius:6px}
+  details.more{margin-top:8px;font-size:12px;color:var(--mute)}
+  details.more summary{cursor:pointer}
+  details.more pre{white-space:pre-wrap;max-height:140px;overflow:auto;margin:6px 0 0;color:#ffb3a8;font:11.5px/1.45 ui-monospace,Menlo,Consolas,monospace}
 
   /* dosya şeridi */
   .strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
@@ -148,6 +154,7 @@
     <section class="stage">
       <div class="monitor" id="monitor">
         <canvas id="mon"></canvas>
+        <div class="monhint" id="monhint" style="display:none"><span>Format seçince kadraj çizgileri burada görünür</span></div>
         <div class="empty" id="empty">
           <h2>Videoları buraya bırak</h2>
           <p>Bitmiş videonu sürükle; her formatın neyi kadrajlayacağını burada göreceksin.</p>
@@ -228,9 +235,14 @@
           <div class="t"><b id="progTitle">Hazırlanıyor</b><span class="ver" id="progPct"></span></div>
           <div class="bar"><i id="barFill"></i></div>
           <div class="s" id="progText"></div>
+          <details class="more" id="errMore" style="display:none"><summary>Teknik ayrıntılar</summary><pre id="errDetail"></pre></details>
           <div class="acts" id="doneActs" style="display:none">
             <button class="ghost" id="openBtn">Klasörü aç</button>
             <button class="ghost" id="againBtn">Yeni paket</button>
+          </div>
+          <div class="acts" id="errActs" style="display:none">
+            <button class="ghost" id="retryBtn">Tekrar dene</button>
+            <button class="ghost" id="closeErr">Kapat</button>
           </div>
         </div>
       </div>
@@ -251,7 +263,13 @@ const FIT_NOTES = {
   track: "Özneyi bulur (yüz, insan, hayvan, belirgin nesne) ve kadrajı sakin bir kameraman gibi onunla kaydırır. Monitördeki çizgiler başlangıç konumunu değil, kadraj boyutunu gösterir."
 };
 let files = [], cur = 0, fit = "blur", jobId = null, outRoot = "", folders = [], prefs = {};
-const selected = new Set(["9x16","4x5","16x9"]);
+const selected = new Set();   // açılışta hiçbir format seçili değil
+const LINE_COLORS = ["#ffd23f","#5ec8ff","#ff7ab6","#7fe08a","#ffa24d","#b69cff","#ff6b5e","#4fe0d2","#e8e8e8","#c8a2ff"];
+const pickOrder = [];          // seçim sırası: renkler buna göre atanır (ilk seçilen sarı, sonra mavi, pembe…)
+const colorOf = key => { const i = pickOrder.indexOf(key); return LINE_COLORS[(i < 0 ? 0 : i) % LINE_COLORS.length]; };
+function syncOrder(){ for (let i = pickOrder.length - 1; i >= 0; i--) if (!selected.has(pickOrder[i])) pickOrder.splice(i, 1);
+  selected.forEach(k => { if (RATIOS[k] && !pickOrder.includes(k)) pickOrder.push(k); }); }
+let phase = "ready";          // ready | busy | done | error
 
 // ---------- ayarlar (bilgisayarda saklanır)
 async function loadPrefs(){ try{ prefs = await (await fetch("/prefs")).json(); }catch(e){ prefs = {}; } prefs.profiles ||= {}; }
@@ -260,14 +278,14 @@ function current(){
   return { watermark: $("#watermark").value, formats:[...selected], fit, lufs: $("#lufs").value,
            preview: $("#preview").checked, res: $("#res").value, letterbox: $("#letterbox").checked, out_root: outRoot };
 }
-function apply(p){
+function apply(p, withFormats = true){
   if (!p) return;
   if (p.watermark !== undefined) $("#watermark").value = p.watermark;
-  if (p.formats){ selected.clear(); p.formats.forEach(f => selected.add(f)); }
+  if (withFormats && p.formats){ selected.clear(); p.formats.forEach(f => selected.add(f)); }
   setFit(p.fit || "blur"); $("#lufs").value = p.lufs || "-14"; $("#preview").checked = p.preview !== false;
   $("#res").value = p.res || "1080"; $("#letterbox").checked = !!p.letterbox;
   if (p.out_root) setOut(p.out_root);
-  renderChips(); update();
+  renderChips(); update(); drawMonitor();
 }
 function rememberLast(){ prefs.last = {...current(), client: $("#client").value}; savePrefs(); }
 
@@ -294,15 +312,16 @@ function arIcon(k){
   return `<span class="ar" style="width:${w}px;height:${r >= 1 ? Math.round(w / r) : h}px"></span>`;
 }
 function renderChips(){
+  syncOrder();
   const all = [...FORMATS, {key:"orijinal",label:"Orijinal",desc:"oran ve boyut korunur",group:"diger"}];
   $("#chips").innerHTML = GROUPS.map(([g,gl]) => {
     const items = all.filter(f => f.group === g); if (!items.length) return "";
     return `<div class="fgroup"><div>${gl}</div><div class="chips">` + items.map(f =>
-      `<button class="chip ${selected.has(f.key)?"on":""}" data-k="${f.key}" title="${esc(f.desc)}" aria-pressed="${selected.has(f.key)}">${arIcon(f.key)}${esc(f.label)}<small>${esc(f.desc)}</small></button>`
+      `<button class="chip ${selected.has(f.key)?"on":""}" data-k="${f.key}" title="${esc(f.desc)}" aria-pressed="${selected.has(f.key)}" style="${selected.has(f.key) && RATIOS[f.key] ? `color:${colorOf(f.key)};border-color:${colorOf(f.key)}` : ""}">${arIcon(f.key)}${esc(f.label)}<small>${esc(f.desc)}</small></button>`
     ).join("") + `</div></div>`;
   }).join("");
   $("#chips").querySelectorAll(".chip").forEach(c => c.onclick = () => {
-    const k = c.dataset.k; selected.has(k) ? selected.delete(k) : selected.add(k); renderChips(); update();
+    const k = c.dataset.k; selected.has(k) ? selected.delete(k) : selected.add(k); renderChips(); update(); drawMonitor();
   });
   $("#fmtCount").textContent = selected.size ? `${selected.size} seçili` : "";
 }
@@ -375,32 +394,46 @@ function drawMonitor(){
   cv.width = Math.round(box.width * dpr); cv.height = Math.round(box.height * dpr);
   const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,box.width,box.height);
   const e = files[cur]; $("#legend").innerHTML = "";
+  $("#monhint").style.display = e && !selected.size ? "" : "none";
   if (!e) return;
   const sw = e.w || 16, sh = e.h || 9, k = Math.min(box.width / sw, box.height / sh) * 0.94;
   const W = sw*k, H = sh*k, X = (box.width-W)/2, Y = (box.height-H)/2;
   if (e.img) g.drawImage(e.img, X, Y, W, H); else { g.fillStyle = "#1a1d22"; g.fillRect(X,Y,W,H); }
-  const src = sw/sh, keys = [...selected].filter(k => RATIOS[k] && Math.abs(RATIOS[k]-src) > 0.01);
+  const src = sw/sh;
+  // Sadece seçili ve kaynaktan farklı oranlı formatlar çizilir; sıra format listesindeki sırayla aynı
+  const chosen = FORMATS.map(f => f.key).filter(key => selected.has(key) && RATIOS[key]);
+  const keys = chosen.filter(key => Math.abs(RATIOS[key] - src) > 0.01);
+  const same = chosen.filter(key => Math.abs(RATIOS[key] - src) <= 0.01);
   g.font = "600 12px " + getComputedStyle(document.body).fontFamily; g.textBaseline = "top";
-  keys.forEach((key, i) => {
-    const r = RATIOS[key]; let w = W, h = H;
+  let tall = 0, wide = 0;
+  keys.forEach(key => {
+    const r = RATIOS[key], col = colorOf(key); let w = W, h = H;
     if (r < src) w = H * r; else h = W / r;
     const x = X + (W-w)/2, y = Y + (H-h)/2;
     g.save();
     if (fit === "blur") g.setLineDash([6,5]);
-    g.strokeStyle = "rgba(255,210,63,.95)"; g.lineWidth = 1.5; g.strokeRect(x+.75, y+.75, w-1.5, h-1.5);
+    g.strokeStyle = col; g.lineWidth = 1.75; g.strokeRect(x+.75, y+.75, w-1.5, h-1.5);
     g.restore();
     const label = (FORMATS.find(f => f.key===key) || {}).label || key;
-    const tx = r < src ? x + 6 : x + 6 + i * 0, ty = r < src ? y + 6 + i*18 : y + 6;
-    g.fillStyle = "rgba(18,20,24,.7)"; const tw = g.measureText(label).width;
-    g.fillRect(tx-4, ty-2, tw+8, 17); g.fillStyle = "#ffd23f"; g.fillText(label, tx, ty);
+    // etiketler üst üste binmesin: dikey kadrajlar alt alta, yatay kadrajlar yan yana
+    const tw = g.measureText(label).width;
+    let tx, ty;
+    if (r < src) { tx = x + 6; ty = y + 6 + tall * 20; tall++; }
+    else { tx = X + 8 + wide; ty = y + 6; wide += tw + 16; }
+    g.fillStyle = "rgba(18,20,24,.75)"; g.fillRect(tx-4, ty-2, tw+8, 17);
+    g.fillStyle = col; g.fillText(label, tx, ty);
   });
-  if (keys.length) $("#legend").innerHTML = fit === "blur"
-    ? `<span><i class="dash"></i>Çizgilerin dışı bulanık dolguyla tamamlanır</span>`
-    : `<span><i></i>${fit === "track" ? "Kadraj boyutu; konum özneyle birlikte kayar" : "Çizgilerin dışı kesilir"}</span>`;
+  const lab = key => esc((FORMATS.find(f => f.key===key) || {}).label || key);
+  const parts = keys.map(key => `<span><i style="border-top-color:${colorOf(key)}${fit === "blur" ? ";border-top-style:dashed" : ""}"></i>${lab(key)}</span>`);
+  same.forEach(key => parts.push(`<span class="same">${lab(key)}: kaynakla aynı oran, kırpılmaz</span>`));
+  if (keys.length) parts.push(`<span class="same">${fit === "blur" ? "Çizgilerin dışı bulanık dolguyla tamamlanır"
+    : fit === "track" ? "Çizgiler kadraj boyutunu gösterir; konum özneyle kayar" : "Çizgilerin dışı kesilir"}</span>`);
+  $("#legend").innerHTML = parts.join("");
 }
 window.addEventListener("resize", drawMonitor);
 
 function update(){
+  backToReady();
   const ok = files.length && selected.size;
   $("#go").disabled = !ok;
   const n = files.length * selected.size;
@@ -411,9 +444,25 @@ function update(){
 
 // ---------- çalıştır
 function showProg(on){ $("#ready").style.display = on ? "none" : ""; $("#prog").style.display = on ? "block" : "none"; }
-$("#go").onclick = async () => {
-  rememberLast(); showProg(true); $("#doneActs").style.display = "none";
+// Sonuç (hazır / hata) kutusu: kullanıcı bir şeyi değiştirdiği an kapanır, sadece güncel durumu gösterir
+function backToReady(){
+  if (phase !== "done" && phase !== "error") return;
+  phase = "ready"; showProg(false);
+}
+function friendly(msg){
+  const text = String(msg || "").replace(/\n\(Teslim Paketi [^)]*\)\s*$/, "").trim();
+  const first = text.split("\n")[0].trim();
+  if (/ffmpeg bulunamadı|Kayıt klasörü|Aktarılamadı|En az bir format|Hiç dosya/.test(first)) return { short: first, detail: text };
+  const m = first.match(/^(.+?) → (.+?) (final|önizleme) başarısız/);
+  if (m) return { short: `${m[1]} dosyasının ${m[2]} ${m[3] === "final" ? "teslim dosyası" : "önizlemesi"} hazırlanamadı.`, detail: text };
+  return { short: "Paket hazırlanırken beklenmedik bir sorun çıktı.", detail: text };
+}
+async function run(){
+  if (!files.length || !selected.size) return;
+  phase = "busy"; rememberLast(); showProg(true);
+  ["#doneActs","#errActs","#errMore"].forEach(s => $(s).style.display = "none");
   $("#progTitle").textContent = "Dosyalar aktarılıyor"; $("#progText").className = "s"; $("#progPct").textContent = "";
+  $("#barFill").style.width = "0%";
   try {
     jobId = (await (await fetch("/new",{method:"POST"})).json()).job;
     for (let i=0;i<files.length;i++){
@@ -431,7 +480,8 @@ $("#go").onclick = async () => {
       version: $("#version").value, ...current()})});
     $("#progTitle").textContent = "İşleniyor"; poll();
   } catch(err) { showError(err.message); }
-};
+}
+$("#go").onclick = run;
 async function poll(){
   let j; try { j = await (await fetch(`/status?job=${jobId}`)).json(); } catch(e) { return setTimeout(poll, 1000); }
   const total = Math.max(1, j.total || 1), pct = Math.min(100, ((j.done||0) + (j.step_pct||0)/100) / total * 100);
@@ -439,6 +489,7 @@ async function poll(){
   $("#progPct").textContent = j.status==="bitti" ? "" : `%${Math.round(pct)}`;
   $("#progText").textContent = j.current || "";
   if (j.status === "bitti"){
+    phase = "done";
     $("#progTitle").innerHTML = '<span class="done">Paket hazır</span>';
     $("#progText").textContent = (j.out_dir || "").replace(/^\/Users\/[^/]+|^C:\\Users\\[^\\]+/i, "~");
     $("#doneActs").style.display = "flex"; fetch(`/open?job=${jobId}`,{method:"POST"}); return;
@@ -447,11 +498,19 @@ async function poll(){
   setTimeout(poll, 700);
 }
 function showError(msg){
-  $("#progTitle").textContent = "Paket hazırlanamadı"; $("#progText").className = "err"; $("#progText").textContent = msg;
-  $("#doneActs").style.display = "flex"; $("#openBtn").style.display = "none";
+  phase = "error";
+  const f = friendly(msg);
+  $("#progTitle").textContent = "Paket hazırlanamadı"; $("#progPct").textContent = "";
+  $("#progText").className = "err"; $("#progText").textContent = f.short;
+  $("#errDetail").textContent = f.detail; $("#errMore").style.display = f.detail && f.detail !== f.short ? "" : "none";
+  $("#errMore").open = false;
+  $("#doneActs").style.display = "none"; $("#errActs").style.display = "flex";
 }
 $("#openBtn").onclick = () => fetch(`/open?job=${jobId}`,{method:"POST"});
-$("#againBtn").onclick = () => { files = []; cur = 0; $("#openBtn").style.display = ""; showProg(false); renderStrip(); drawMonitor(); update(); };
+$("#againBtn").onclick = () => { files = []; cur = 0; phase = "done"; backToReady(); renderStrip(); drawMonitor(); update(); };
+$("#retryBtn").onclick = run;
+$("#closeErr").onclick = backToReady;
+["#client","#project","#version","#watermark"].forEach(sel => $(sel).addEventListener("input", backToReady));
 $("#quit").onclick = async () => {
   try { await fetch("/quit",{method:"POST"}); } catch(e) {}
   document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;color:#9aa1ad;font:15px var(--ui)">Teslim Paketi kapatıldı. Bu sekmeyi kapatabilirsin.</div>';
@@ -485,7 +544,7 @@ setInterval(() => fetch("/ping").catch(() => {}), 20000);
   if (!info.ffmpeg) { $("#ffWarn").style.display = "block"; $("#health").innerHTML = '<span class="dot bad"></span><span>ffmpeg eksik</span>'; }
   else $("#health").innerHTML = `<span class="dot"></span><span>Hazır</span>`;
   outRoot = info.out; renderChips(); renderProfiles();
-  if (prefs.last) { apply(prefs.last); if (prefs.last.client) $("#client").value = prefs.last.client; }
+  if (prefs.last) { apply(prefs.last, false); if (prefs.last.client) $("#client").value = prefs.last.client; }
   else { setFit("blur"); renderFolders(); }
   renderFolders(); renderStrip(); update();
 })();

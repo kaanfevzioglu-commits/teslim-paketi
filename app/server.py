@@ -27,7 +27,7 @@ APP_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
 
-VERSION = "2.1.2"
+VERSION = "2.1.3"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
