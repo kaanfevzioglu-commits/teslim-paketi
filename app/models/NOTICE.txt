@@ -1,0 +1,6 @@
+Teslim Paketi ile gelen modeller ve lisansları
+
+face_detection_yunet.onnx  YuNet yüz dedektörü (libfacedetection.train, Shiqi Yu) — MIT lisansı
+yolox_tiny.onnx            YOLOX-tiny nesne dedektörü (Megvii) — Apache License 2.0
+haarcascade_*.xml          OpenCV Haar modelleri — Intel License Agreement for Open Source Computer Vision Library
+OpenCV kütüphanesi         Apache License 2.0

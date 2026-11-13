@@ -250,10 +250,14 @@ def _contains(outer, inner, tol=0.05):
             inner["y"] + inner["h"] <= outer["y"] + outer["h"] + tol)
 
 
-def _select_subjects(frames):
-    """Her kare için özne kutusu ve (varsa) yüz kutusu. Önceki özneye yakın olanı tercih eder."""
+def _select_subjects(frames, cuts=()):
+    """Her kare için özne kutusu ve (varsa) yüz kutusu. Önceki özneye yakın olanı tercih eder;
+    sahne geçişinde bu tercih sıfırlanır (yeni planda eski özneye yapışmasın)."""
     chosen, prev = [], None
-    for fr in frames:
+    cuts = set(cuts)
+    for idx, fr in enumerate(frames):
+        if idx in cuts:
+            prev = None
         boxes = [b for b in fr.get("boxes", []) if b["w"] > 0.01 and b["h"] > 0.01]
         best, best_s = None, 0.0
         for b in boxes:
@@ -335,7 +339,7 @@ def path_from_vision(vision, analysis, axis, frac, smoothness=0.35):
     n = len(frames)
     if n == 0:
         return None
-    chosen = _select_subjects(frames)
+    chosen = _select_subjects(frames, (analysis or {}).get("cuts", []))
     if axis == "x":
         lo_raw = [b["x"] if b else None for b, _ in chosen]
         hi_raw = [b["x"] + b["w"] if b else None for b, _ in chosen]

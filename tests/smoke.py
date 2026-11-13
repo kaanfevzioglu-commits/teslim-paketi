@@ -42,7 +42,7 @@ ff("-f", "lavfi", "-i", "testsrc=s=1280x720:r=24:d=3", "-f", "lavfi", "-i", "sin
 ff("-f", "concat", "-safe", "0", "-i", str(TMP / "l.txt"), "-c", "copy", str(src / "Karışık Teaser.mp4"))
 # 2) uzun ve sürekli hareket eden video (Windows komut uzunluğu sınırı testi)
 ff("-f", "lavfi", "-i", "gradients=s=1920x1080:d=30:speed=0.0001", "-f", "lavfi",
-   "-i", "color=c=black@0:s=220x220:d=30,format=rgba,geq=r='255':g='150':b='30':a='if(lt(hypot(X-110,Y-110),105),255,0)'",
+   "-i", "color=c=0xff9620:s=220x220:d=30",
    "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
    "-filter_complex", "[0][1]overlay=x='80+(1920-380)*(0.5-0.5*cos(t*2*PI/9))':y=430:shortest=1,format=yuv420p[v]",
    "-map", "[v]", "-map", "2:a", "-t", "30", "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
@@ -81,11 +81,28 @@ for fit in ("track", "blur"):
         print(job.get("error"))
         failed = True
         continue
-    rapor = (Path(job["out_dir"]) / "teslim_raporu.txt").read_text(encoding="utf-8")
+    rapor = job.get("report", "")
+    extra = [p.name for p in Path(job["out_dir"]).iterdir() if p.is_file() and p.suffix != ".mp4"]
+    if extra:
+        print("HATA: teslim klasöründe video dışı dosya var:", extra)
+        failed = True
     print(rapor)
     if fit == "track" and "FİLİGRANSIZ" in rapor:
         print("HATA: önizleme filigranı uygulanmadı")
         failed = True
+
+# OpenCV özne tespiti (Windows'ta takibin temeli): modeller yüklü ve çalışıyor mu?
+import gorus  # noqa: E402
+print("\nOpenCV:", gorus.AVAILABLE)
+if gorus.AVAILABLE:
+    v, err = gorus.analyze(FF, src / "Karışık Teaser.mp4", str(ROOT / "app"), 1920, 1080)
+    print("OpenCV tespit:", None if v is None else f"{len(v['frames'])} kare, yüz={v['faces']}, nesne={v['objects']}", err or "")
+    if v is None or v["faces"] != "yunet" or v["objects"] != "yolox":
+        print("HATA: OpenCV modelleri yüklenemedi")
+        failed = True
+else:
+    print("HATA: OpenCV kurulu değil")
+    failed = True
 
 if sys.platform == "darwin":
     binary, why = takip.vision_binary(str(ROOT / "app"), str(ROOT / "build"))

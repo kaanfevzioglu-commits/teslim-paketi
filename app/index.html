@@ -216,7 +216,7 @@
               <option value="-23">-23 LUFS, TV yayını</option>
             </select>
           </div>
-          <label class="check"><input type="checkbox" id="preview" checked> Ödeme öncesi müşteri için filigranlı önizleme de üret</label>
+          <label class="check"><input type="checkbox" id="preview"> Ödeme öncesi müşteri için filigranlı önizleme de üret (ayrı "Onizleme" klasörüne)</label>
         </div>
 
         <div class="step">
@@ -282,7 +282,7 @@ function apply(p, withFormats = true){
   if (!p) return;
   if (p.watermark !== undefined) $("#watermark").value = p.watermark;
   if (withFormats && p.formats){ selected.clear(); p.formats.forEach(f => selected.add(f)); }
-  setFit(p.fit || "blur"); $("#lufs").value = p.lufs || "-14"; $("#preview").checked = p.preview !== false;
+  setFit(p.fit || "blur"); $("#lufs").value = p.lufs || "-14"; $("#preview").checked = !!p.preview;
   $("#res").value = p.res || "1080"; $("#letterbox").checked = !!p.letterbox;
   if (p.out_root) setOut(p.out_root);
   renderChips(); update(); drawMonitor();

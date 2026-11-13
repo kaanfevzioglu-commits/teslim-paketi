@@ -17,6 +17,8 @@ args = [
     "--name", name,
     "--paths", str(ROOT / "app"),
     "--hidden-import", "takip",
+    "--hidden-import", "gorus",
+    "--add-data", f"{ROOT / 'app' / 'models'}{SEP}models",
     "--add-data", f"{ROOT / 'app' / 'index.html'}{SEP}.",
     "--add-data", f"{ROOT / 'app' / 'kadraj.swift'}{SEP}.",
     "--distpath", str(ROOT / "dist"),

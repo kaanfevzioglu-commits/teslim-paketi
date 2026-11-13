@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: derle
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -31,6 +31,8 @@ jobs:
         run: echo "VER=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/server.py',encoding='utf-8').read()).group(1))")" >> $GITHUB_ENV
       - name: ffmpeg indir
         run: python scripts/get_ffmpeg.py
+      - name: OpenCV (özne tespiti)
+        run: python -m pip install "opencv-contrib-python-headless==4.10.0.84" "numpy<2.3"
       - name: Duman testi (gerçek Windows)
         run: python tests/smoke.py
       - name: Uygulamayı derle
@@ -72,6 +74,8 @@ jobs:
         run: echo "VER=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/server.py',encoding='utf-8').read()).group(1))")" >> $GITHUB_ENV
       - name: ffmpeg indir
         run: python scripts/get_ffmpeg.py
+      - name: OpenCV (özne tespiti)
+        run: python -m pip install "opencv-contrib-python-headless==4.10.0.84" "numpy<2.3"
       - name: Apple Vision bileşenini derle
         run: swiftc -O app/kadraj.swift -o build/bin/kadraj
       - name: Duman testi (gerçek macOS)

@@ -26,8 +26,9 @@ FROZEN = bool(getattr(sys, "frozen", False))
 APP_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
+import gorus  # noqa: E402
 
-VERSION = "2.1.3"
+VERSION = "2.2.0"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
@@ -443,7 +444,7 @@ def process_job(job_id, settings):
         res = str(settings.get("res", "1080"))
         letterbox = bool(settings.get("letterbox", False))
         lufs = float(settings.get("lufs", -14))
-        make_preview = bool(settings.get("preview", True))
+        make_preview = bool(settings.get("preview", False))
         wm_text = settings.get("watermark") or "ONIZLEME"
 
         root = Path(settings.get("out_root") or OUTPUT_ROOT).expanduser()
@@ -454,11 +455,12 @@ def process_job(job_id, settings):
                 raise RuntimeError(f"Kayıt klasörü bulunamadı: {root}")
         out_dir = root / f"{client}_{project}_{date}"
         k = 2
-        while (out_dir / "FINAL").exists() and any((out_dir / "FINAL").iterdir()) and settings.get("new_folder", True):
+        while out_dir.exists() and any(out_dir.glob("*.mp4")) and settings.get("new_folder", True):
             out_dir = root / f"{client}_{project}_{date}_{k}"
             k += 1
-        final_dir, prev_dir, check_dir = out_dir / "FINAL", out_dir / "ONIZLEME", out_dir / "_kontrol"
-        for d in (final_dir, check_dir) + ((prev_dir,) if make_preview else ()):
+        # Klasörde sadece teslim dosyaları olur; önizleme istenirse ayrı alt klasöre gider.
+        final_dir, prev_dir = out_dir, out_dir / "Onizleme"
+        for d in (final_dir,) + ((prev_dir,) if make_preview else ()):
             d.mkdir(parents=True, exist_ok=True)
         job["out_dir"] = str(out_dir)
 
@@ -511,11 +513,20 @@ def process_job(job_id, settings):
                     vision, verr = takip.run_vision(vision_bin, src)
                     if vision is None:
                         vision_why = f"Vision çalışmadı: {verr}"
+                    else:
+                        vision["engine"] = "Apple Vision"
+                if vision is None and gorus.AVAILABLE:
+                    job["current"] = f"{src.name}: özne tespiti (yüz, insan, nesne)"
+                    vision, verr = gorus.analyze(FFMPEG, src, str(APP_DIR), vw, vh)
+                    if vision is not None:
+                        vision["engine"] = f"OpenCV (yüz: {vision.get('faces')}, insan/nesne: {vision.get('objects')})"
+                    else:
+                        vision_why = (vision_why or "") + f" | OpenCV: {verr}"
                 if not use_sub:
                     report.append("  Not: bu bilgisayardaki ffmpeg piksel altı kaydırmayı desteklemiyor; "
                                   "güvenli tam piksel yöntemi kullanıldı")
                 if vision:
-                    report.append("  Takip: Apple Vision özne tespiti + kompozisyon kuralları")
+                    report.append(f"  Takip: {vision.get('engine', 'özne tespiti')} + kompozisyon kuralları")
                 else:
                     report.append(f"  Takip: hareket analizi (yedek yöntem — {vision_why or 'Vision yok'})")
             job["done"] += 1
@@ -575,10 +586,6 @@ def process_job(job_id, settings):
                 job["done"] += 1
                 report.append(f"  FINAL   {name}  ({ow}x{oh}){note}")
 
-                if f == "9x16":
-                    safe_area_sheet(final_path, check_dir / f"{project}_{stem}_9x16_guvenli-alan.png", ow, oh, dur)
-                if note:
-                    track_sheet(final_path, check_dir / f"{project}_{stem}_{label}_takip.jpg", dur)
 
                 if make_preview:
                     pname = f"{project}_{stem}_{label}_ONIZLEME.mp4"
@@ -603,11 +610,15 @@ def process_job(job_id, settings):
                     report.append(f"  ÖNİZLEME {pname}  ({pw}x{ph}, {mark})")
             report.append("")
 
-        report += ["Notlar:",
-                   "- _kontrol/…guvenli-alan.png: kırmızı alanlar Reels/TikTok arayüzünün yaklaşık kapladığı",
-                   "  yerlerdir. Önemli yazı ve yüzler bu alanlara denk gelmemeli.",
-                   "- _kontrol/…takip.jpg: akıllı takibin videonun farklı anlarında nereyi kadrajladığı."]
-        (out_dir / "teslim_raporu.txt").write_text("\n".join(report), encoding="utf-8")
+        # Rapor teslim klasörüne değil, uygulamanın kendi kayıtlarına yazılır (sorun gidermek için)
+        job["report"] = "\n".join(report)
+        print(job["report"])
+        try:
+            rdir = DATA_DIR / "raporlar"
+            rdir.mkdir(parents=True, exist_ok=True)
+            (rdir / f"{out_dir.name}.txt").write_text(job["report"], encoding="utf-8")
+        except OSError:
+            pass
         shutil.rmtree(src_dir, ignore_errors=True)
         job["status"] = "bitti"
         job["current"] = "Tamamlandı"
