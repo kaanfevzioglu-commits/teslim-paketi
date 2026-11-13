@@ -27,7 +27,7 @@ APP_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
 
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
@@ -233,7 +233,8 @@ def watermark_filters(text):
     """Yedek yol: ffmpeg'de drawtext varsa filigranı onunla çizer."""
     text = (text or "ONIZLEME").strip()[:24]
     t = esc_drawtext(text)
-    font = f"fontfile='{FONT}':" if FONT else ""
+    # Windows yolundaki "C:" iki noktası ffmpeg'de ayırıcı sayılır: kaçış karakteriyle koru
+    font = f"fontfile='{FONT.replace(chr(92), '/').replace(':', chr(92) + ':')}':" if FONT else ""
     small = f"min(w/3/({max(len(text), 6)}*0.95)\\,h/22)"
     parts = []
     for row in range(6):

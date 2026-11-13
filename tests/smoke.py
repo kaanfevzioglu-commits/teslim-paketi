@@ -55,17 +55,36 @@ for fit in ("track", "blur"):
     for p in src.iterdir():
         (d / p.name).write_bytes(p.read_bytes())
     server.JOBS[jid] = {"status": "x", "done": 0, "total": 0, "step_pct": 0, "current": ""}
+    fmts = ["9x16", "235"] if fit == "track" else ["9x16", "orijinal"]
+    if fit == "track":
+        # Gerçek uygulamadaki gibi: önizleme filigranı PNG olarak hazır gelir (tarayıcı çizer)
+        wm = d / "_wm"
+        wm.mkdir(exist_ok=True)
+        for p in d.iterdir():
+            if not p.is_file():
+                continue
+            v = server.probe(p)["video"]
+            dw, dh = server.display_size(v)
+            for f in fmts:
+                ow, oh, _, _ = server.dims(f, dw, dh, "1080", False)
+                pw, ph = server.preview_size(ow, oh)
+                ff("-f", "lavfi", "-i", f"color=c=black@0.0:s={pw}x{ph},format=rgba,"
+                   f"drawbox=x=iw/4:y=ih/2-20:w=iw/2:h=40:color=white@0.35:t=fill",
+                   "-frames:v", "1", str(wm / f"wm_{pw}x{ph}.png"))
     t = time.time()
     server.process_job(jid, {"client": "Test Müşteri", "project": f"duman {fit}", "fit": fit, "preview": True,
-                             "formats": ["9x16", "235"] if fit == "track" else ["9x16", "orijinal"],
-                             "letterbox": fit == "blur"})
+                             "formats": fmts, "letterbox": fit == "blur"})
     job = server.JOBS[jid]
     print(f"\n== {fit}: {job['status']} ({time.time() - t:.0f} sn)")
     if job["status"] != "bitti":
         print(job.get("error"))
         failed = True
         continue
-    print((Path(job["out_dir"]) / "teslim_raporu.txt").read_text(encoding="utf-8"))
+    rapor = (Path(job["out_dir"]) / "teslim_raporu.txt").read_text(encoding="utf-8")
+    print(rapor)
+    if fit == "track" and "FİLİGRANSIZ" in rapor:
+        print("HATA: önizleme filigranı uygulanmadı")
+        failed = True
 
 if sys.platform == "darwin":
     binary, why = takip.vision_binary(str(ROOT / "app"), str(ROOT / "build"))
