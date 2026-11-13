@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teslim Paketi</title>
+<style>
+  :root{
+    --bay:#1d2026;        /* kurgu odası zemini */
+    --panel:#252930;
+    --panel-2:#2c313a;
+    --line:#383e49;
+    --text:#ebe8e2;
+    --mute:#9aa1ad;
+    --frame:#ffd23f;      /* kadraj çizgisi sarısı: tek vurgu */
+    --frame-ink:#231c00;
+    --safe:#ff6b5e;
+    --ok:#7fd1a0;
+    --r-lg:14px; --r-md:9px; --r-sm:6px;
+    --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --disp: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bay);color:var(--text);font:14px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--frame);outline-offset:2px}
+  .app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+
+  /* üst şerit */
+  .top{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--line)}
+  .mark{width:26px;height:18px;border:2px solid var(--frame);border-radius:3px;position:relative}
+  .mark::after{content:"";position:absolute;inset:3px 7px;border:1.5px solid var(--frame);border-radius:1px;opacity:.7}
+  .brand{font:600 17px/1 var(--disp);letter-spacing:-.01em}
+  .ver{color:var(--mute);font-size:12px}
+  .top .sp{flex:1}
+  .health{font-size:12.5px;color:var(--mute);display:flex;align-items:center;gap:7px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+  .dot.bad{background:var(--safe)}
+  .ghost{background:transparent;border:1px solid var(--line);border-radius:var(--r-md);padding:7px 12px;cursor:pointer}
+  .ghost:hover{border-color:#4b5260}
+
+  .warn{display:none;margin:16px 24px 0;padding:12px 14px;border:1px solid #6a3a33;background:#3a2522;border-radius:var(--r-md);color:#ffc2b8}
+
+  /* gövde */
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:0;min-height:0;overflow:hidden}
+  .stage{padding:22px 24px;display:flex;flex-direction:column;gap:16px;min-width:0;overflow:auto}
+  .rail{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  .rail-scroll{padding:8px 22px 18px;overflow:auto;flex:1}
+
+  /* monitör */
+  .monitor{position:relative;background:#121418;border-radius:var(--r-lg);aspect-ratio:16/9;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+  .monitor.over{border-color:var(--frame)}
+  .monitor canvas{position:absolute;inset:0;width:100%;height:100%}
+  .empty{position:relative;text-align:center;padding:30px;max-width:420px}
+  .empty h2{font:600 26px/1.15 var(--disp);letter-spacing:-.02em;margin:0 0 8px}
+  .empty p{color:var(--mute);margin:0 0 18px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;color:var(--mute);font-size:12.5px;min-height:18px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:0;border-top:2px solid var(--frame)}
+  .legend i.dash{border-top-style:dashed}
+
+  /* dosya şeridi */
+  .strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+  .clip{flex:none;width:168px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);
+    overflow:hidden;cursor:pointer;position:relative;text-align:left;padding:0}
+  .clip.sel{border-color:var(--frame)}
+  .clip .th{aspect-ratio:16/9;background:#121418 center/cover no-repeat;display:block}
+  .clip .meta{padding:7px 9px 8px}
+  .clip .nm{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clip .dt{font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+  .clip .x{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;border:0;
+    background:rgba(18,20,24,.75);color:var(--text);cursor:pointer;line-height:22px;font-size:14px}
+  .addclip{flex:none;width:110px;border:1.5px dashed var(--line);border-radius:var(--r-md);background:transparent;
+    color:var(--mute);cursor:pointer}
+
+  /* sağ ray: adımlar */
+  .step{padding:16px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .step h3{margin:0 0 12px;font:600 14.5px/1.2 var(--disp);display:flex;align-items:baseline;gap:9px}
+  .step h3 b{font-weight:600;color:var(--frame);font-variant-numeric:tabular-nums;font-size:12.5px}
+  .step h3 small{margin-left:auto;font-weight:400;color:var(--mute);font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fld label{display:block;font-size:12px;color:var(--mute);margin-bottom:5px}
+  input[type=text],input[type=number],select{width:100%;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:8px 10px}
+  input:focus,select:focus{outline:none;border-color:var(--frame)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row select{flex:1}
+  .fgroup{margin-bottom:10px}
+  .fgroup > div:first-child{font-size:12px;color:var(--mute);margin-bottom:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel-2);
+    border-radius:var(--r-sm);padding:6px 9px;cursor:pointer;font-size:13px;user-select:none}
+  .chip .ar{display:inline-block;border:1.5px solid currentColor;border-radius:2px;opacity:.7}
+  .chip.on{border-color:var(--frame);color:var(--frame);background:#3a3420}
+  .chip small{color:var(--mute);font-size:11.5px}
+  .chip.on small{color:#d9c37a}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+  .seg button{background:var(--panel-2);border:0;padding:8px 6px;cursor:pointer;color:var(--mute);font-size:13px}
+  .seg button + button{border-left:1px solid var(--line)}
+  .seg button.on{background:#3a3420;color:var(--frame)}
+  .note{color:var(--mute);font-size:12.5px;margin:8px 0 0}
+  .check{display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;margin-top:10px}
+  .check input{accent-color:var(--frame);width:15px;height:15px;margin-top:2px}
+  .path{font-size:12px;color:var(--mute);margin-top:8px;word-break:break-all}
+
+  /* alt eylem çubuğu */
+  .dock{border-top:1px solid var(--line);padding:14px 22px;background:var(--panel)}
+  .sum{font-size:12.5px;color:var(--mute);margin-bottom:10px;min-height:19px}
+  .go{width:100%;background:var(--frame);color:var(--frame-ink);border:0;border-radius:var(--r-md);
+    padding:12px;font-weight:650;font-size:15px;cursor:pointer}
+  .go:disabled{opacity:.35;cursor:default}
+  .prog{display:none}
+  .prog .t{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+  .prog .t b{font-weight:600}
+  .bar{height:6px;background:#1b1e23;border-radius:9px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--frame);transition:width .35s ease}
+  .prog .s{font-size:12px;color:var(--mute);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prog .err{white-space:pre-wrap;color:#ffb3a8;font-size:12px;max-height:120px;overflow:auto}
+  .done{color:var(--ok)}
+  .acts{display:flex;gap:8px;margin-top:10px}
+  .acts .ghost{flex:1}
+
+  @media (max-width: 900px){
+    .app{height:auto;min-height:100vh}
+    .body{grid-template-columns:1fr;overflow:visible}
+    .rail{border-left:0;border-top:1px solid var(--line)}
+  }
+  @media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="mark" aria-hidden="true"></div>
+    <div class="brand">Teslim Paketi</div>
+    <div class="ver" id="ver"></div>
+    <div class="sp"></div>
+    <div class="health" id="health"><span class="dot"></span><span>Hazır</span></div>
+    <button class="ghost" id="quit" title="Uygulamayı kapat">Kapat</button>
+  </header>
+
+  <div class="warn" id="ffWarn">Videoları işlemek için ffmpeg gerekli ve bu bilgisayarda bulunamadı. Uygulamayı kapatıp yeniden aç; açılışta kurulum için yönlendirileceksin.</div>
+
+  <main class="body">
+    <section class="stage">
+      <div class="monitor" id="monitor">
+        <canvas id="mon"></canvas>
+        <div class="empty" id="empty">
+          <h2>Videoları buraya bırak</h2>
+          <p>Bitmiş videonu sürükle; her formatın neyi kadrajlayacağını burada göreceksin.</p>
+          <button class="ghost" id="pickFiles">Dosya seç</button>
+        </div>
+        <input type="file" id="picker" accept="video/*,.mov,.mp4,.m4v,.mkv,.webm" multiple hidden>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="strip" id="strip"></div>
+    </section>
+
+    <aside class="rail">
+      <div class="rail-scroll">
+        <div class="step">
+          <h3><b>1</b>Müşteri ve proje</h3>
+          <div class="fld" style="margin-bottom:10px">
+            <label for="profileSel">Kayıtlı müşteri</label>
+            <div class="row">
+              <select id="profileSel"><option value="">Yeni müşteri</option></select>
+              <button class="ghost" id="saveProfile" title="Bu ayarları müşteri olarak kaydet">Kaydet</button>
+              <button class="ghost" id="delProfile" title="Seçili müşteriyi sil">Sil</button>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="fld"><label for="client">Müşteri</label><input type="text" id="client" placeholder="hodl."></div>
+            <div class="fld"><label for="project">Proje</label><input type="text" id="project" placeholder="Kasım reels"></div>
+            <div class="fld"><label for="version">Versiyon</label><input type="number" id="version" value="1" min="1"></div>
+            <div class="fld"><label for="watermark">Önizleme filigranı</label><input type="text" id="watermark" placeholder="Stüdyo adın"></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <h3><b>2</b>Formatlar <small id="fmtCount"></small></h3>
+          <div id="chips"></div>
+          <label class="check"><input type="checkbox" id="letterbox"> Sinema formatlarını 16:9 içinde siyah bantlı ver</label>
+          <div class="fld" style="margin-top:12px">
+            <label for="res">Çözünürlük</label>
+            <select id="res">
+              <option value="720">720p, hafif ve hızlı paylaşım</option>
+              <option value="1080" selected>1080p, standart</option>
+              <option value="2160">4K, büyük ekran ve sinema</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="step">
+          <h3><b>3</b>Kadraj ve ses</h3>
+          <div class="seg" id="fit" role="radiogroup" aria-label="Farklı orana yerleşim">
+            <button data-v="blur" class="on">Bulanık dolgu</button>
+            <button data-v="crop">Ortadan kırp</button>
+            <button data-v="track">Akıllı takip</button>
+          </div>
+          <p class="note" id="fitNote"></p>
+          <div class="fld" style="margin-top:12px">
+            <label for="lufs">Ses seviyesi</label>
+            <select id="lufs">
+              <option value="-14">-14 LUFS, Instagram, TikTok, YouTube</option>
+              <option value="-16">-16 LUFS, daha sakin, podcast</option>
+              <option value="-23">-23 LUFS, TV yayını</option>
+            </select>
+          </div>
+          <label class="check"><input type="checkbox" id="preview" checked> Ödeme öncesi müşteri için filigranlı önizleme de üret</label>
+        </div>
+
+        <div class="step">
+          <h3><b>4</b>Kayıt yeri</h3>
+          <div class="chips" id="folders"></div>
+          <div class="path" id="outPath"></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div id="ready">
+          <div class="sum" id="sum">Önce video ekle.</div>
+          <button class="go" id="go" disabled>Paketi hazırla</button>
+        </div>
+        <div class="prog" id="prog">
+          <div class="t"><b id="progTitle">Hazırlanıyor</b><span class="ver" id="progPct"></span></div>
+          <div class="bar"><i id="barFill"></i></div>
+          <div class="s" id="progText"></div>
+          <div class="acts" id="doneActs" style="display:none">
+            <button class="ghost" id="openBtn">Klasörü aç</button>
+            <button class="ghost" id="againBtn">Yeni paket</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let FORMATS = [];
+const GROUPS = [["sosyal","Sosyal"],["yatay","Yatay"],["sinema","Sinema"],["diger","Diğer"]];
+const RATIOS = {"9x16":9/16,"4x5":4/5,"1x1":1,"2x3":2/3,"3x4":3/4,"16x9":16/9,"4x3":4/3,"185":1.85,"235":2.35,"239":2.39};
+const FIT_NOTES = {
+  blur: "Görüntünün tamamı korunur; farklı orandaki boşluk aynı videonun bulanık haliyle dolar.",
+  crop: "Kadraj tamamen dolar; monitördeki çizgilerin dışı kesilir.",
+  track: "Özneyi bulur (yüz, insan, hayvan, belirgin nesne) ve kadrajı sakin bir kameraman gibi onunla kaydırır. Monitördeki çizgiler başlangıç konumunu değil, kadraj boyutunu gösterir."
+};
+let files = [], cur = 0, fit = "blur", jobId = null, outRoot = "", folders = [], prefs = {};
+const selected = new Set(["9x16","4x5","16x9"]);
+
+// ---------- ayarlar (bilgisayarda saklanır)
+async function loadPrefs(){ try{ prefs = await (await fetch("/prefs")).json(); }catch(e){ prefs = {}; } prefs.profiles ||= {}; }
+function savePrefs(){ fetch("/prefs",{method:"POST",body:JSON.stringify(prefs)}); }
+function current(){
+  return { watermark: $("#watermark").value, formats:[...selected], fit, lufs: $("#lufs").value,
+           preview: $("#preview").checked, res: $("#res").value, letterbox: $("#letterbox").checked, out_root: outRoot };
+}
+function apply(p){
+  if (!p) return;
+  if (p.watermark !== undefined) $("#watermark").value = p.watermark;
+  if (p.formats){ selected.clear(); p.formats.forEach(f => selected.add(f)); }
+  setFit(p.fit || "blur"); $("#lufs").value = p.lufs || "-14"; $("#preview").checked = p.preview !== false;
+  $("#res").value = p.res || "1080"; $("#letterbox").checked = !!p.letterbox;
+  if (p.out_root) setOut(p.out_root);
+  renderChips(); update();
+}
+function rememberLast(){ prefs.last = {...current(), client: $("#client").value}; savePrefs(); }
+
+function renderProfiles(){
+  const sel = $("#profileSel"), keep = sel.value;
+  sel.innerHTML = '<option value="">Yeni müşteri</option>' +
+    Object.keys(prefs.profiles).sort((a,b)=>a.localeCompare(b,"tr")).map(k => `<option>${esc(k)}</option>`).join("");
+  if (prefs.profiles[keep]) sel.value = keep;
+}
+$("#saveProfile").onclick = () => {
+  const name = $("#client").value.trim(); if (!name) { $("#client").focus(); return; }
+  prefs.profiles[name] = current(); savePrefs(); renderProfiles(); $("#profileSel").value = name;
+};
+$("#delProfile").onclick = () => {
+  const k = $("#profileSel").value; if (!k) return;
+  delete prefs.profiles[k]; savePrefs(); renderProfiles();
+};
+$("#profileSel").onchange = e => { const p = prefs.profiles[e.target.value]; if (p){ $("#client").value = e.target.value; apply(p); } };
+
+// ---------- formatlar
+function arIcon(k){
+  const r = RATIOS[k]; if (!r) return '<span class="ar" style="width:12px;height:9px;border-style:dashed"></span>';
+  const h = 12, w = Math.max(6, Math.min(22, Math.round(h * r)));
+  return `<span class="ar" style="width:${w}px;height:${r >= 1 ? Math.round(w / r) : h}px"></span>`;
+}
+function renderChips(){
+  const all = [...FORMATS, {key:"orijinal",label:"Orijinal",desc:"oran ve boyut korunur",group:"diger"}];
+  $("#chips").innerHTML = GROUPS.map(([g,gl]) => {
+    const items = all.filter(f => f.group === g); if (!items.length) return "";
+    return `<div class="fgroup"><div>${gl}</div><div class="chips">` + items.map(f =>
+      `<button class="chip ${selected.has(f.key)?"on":""}" data-k="${f.key}" title="${esc(f.desc)}" aria-pressed="${selected.has(f.key)}">${arIcon(f.key)}${esc(f.label)}<small>${esc(f.desc)}</small></button>`
+    ).join("") + `</div></div>`;
+  }).join("");
+  $("#chips").querySelectorAll(".chip").forEach(c => c.onclick = () => {
+    const k = c.dataset.k; selected.has(k) ? selected.delete(k) : selected.add(k); renderChips(); update();
+  });
+  $("#fmtCount").textContent = selected.size ? `${selected.size} seçili` : "";
+}
+function setFit(v){
+  fit = v; $("#fit").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.v===v); b.setAttribute("aria-checked", b.dataset.v===v); });
+  $("#fitNote").textContent = FIT_NOTES[v] || ""; drawMonitor();
+}
+$("#fit").querySelectorAll("button").forEach(b => b.onclick = () => { setFit(b.dataset.v); update(); });
+
+// ---------- kayıt yeri
+function setOut(p){ outRoot = p; renderFolders(); }
+function renderFolders(){
+  const known = folders.some(f => f.path === outRoot);
+  $("#folders").innerHTML = folders.map(f =>
+    `<button class="chip ${f.path===outRoot?"on":""}" data-p="${esc(f.path)}">${esc(f.label)}</button>`).join("") +
+    `<button class="chip ${outRoot && !known ? "on":""}" id="pickFolder">${outRoot && !known ? "Seçilen klasör" : "Klasör seç…"}</button>`;
+  $("#folders").querySelectorAll("[data-p]").forEach(b => b.onclick = () => { setOut(b.dataset.p); rememberLast(); });
+  $("#pickFolder").onclick = async () => {
+    $("#pickFolder").textContent = "Pencere açıldı…";
+    const r = await (await fetch("/pick_folder",{method:"POST"})).json();
+    if (r.path) { setOut(r.path); rememberLast(); } else renderFolders();
+  };
+  $("#outPath").textContent = outRoot ? "Paket şuraya kaydedilecek: " + outRoot.replace(/^\/Users\/[^/]+|^C:\\Users\\[^\\]+/i, "~") : "";
+}
+
+// ---------- dosyalar, küçük resimler, monitör
+const monitor = $("#monitor");
+$("#pickFiles").onclick = () => $("#picker").click();
+$("#picker").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+["dragenter","dragover"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); monitor.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev==="drop" || e.target===document.documentElement) monitor.classList.remove("over"); }));
+document.addEventListener("drop", e => { monitor.classList.remove("over"); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); });
+
+function tc(sec){ if (!isFinite(sec)) return ""; const m = Math.floor(sec/60), s = sec - m*60; return `${m}:${s.toFixed(1).padStart(4,"0")}`; }
+function thumb(entry){
+  const v = document.createElement("video"); v.muted = true; v.preload = "metadata"; v.src = URL.createObjectURL(entry.file);
+  v.onloadedmetadata = () => { entry.w = v.videoWidth; entry.h = v.videoHeight; entry.dur = v.duration;
+    v.currentTime = Math.min(Math.max(0.1, v.duration * 0.4), v.duration || 0); renderStrip(); drawMonitor(); };
+  v.onseeked = () => {
+    const c = document.createElement("canvas"); const s = Math.min(1, 960 / (v.videoWidth || 960));
+    c.width = Math.round((v.videoWidth||960) * s); c.height = Math.round((v.videoHeight||540) * s);
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    entry.img = c; entry.url = c.toDataURL("image/jpeg", .8); URL.revokeObjectURL(v.src);
+    renderStrip(); drawMonitor();
+  };
+  v.onerror = () => { entry.noThumb = true; renderStrip(); };
+}
+function addFiles(list){
+  for (const f of list) if (!files.some(x => x.file.name===f.name && x.file.size===f.size)) { const e = {file:f}; files.push(e); thumb(e); }
+  if (files.length && cur >= files.length) cur = 0;
+  renderStrip(); drawMonitor(); update();
+}
+function renderStrip(){
+  $("#empty").style.display = files.length ? "none" : "";
+  $("#strip").innerHTML = files.map((e,i) => `
+    <div class="clip ${i===cur?"sel":""}" data-i="${i}" role="button" tabindex="0">
+      <span class="th" style="${e.url ? `background-image:url(${e.url})` : ""}"></span>
+      <button class="x" data-x="${i}" title="Listeden çıkar" aria-label="${esc(e.file.name)} listeden çıkar">×</button>
+      <div class="meta"><div class="nm">${esc(e.file.name)}</div>
+      <div class="dt">${e.w ? `${e.w}×${e.h} · ${tc(e.dur)}` : (e.file.size/1048576).toFixed(1) + " MB"}</div></div>
+    </div>`).join("") + (files.length ? `<button class="addclip" id="addMore">Video ekle</button>` : "");
+  $("#strip").querySelectorAll(".clip").forEach(c => c.onclick = ev => {
+    if (ev.target.dataset.x !== undefined) { files.splice(+ev.target.dataset.x, 1); cur = Math.min(cur, Math.max(0, files.length-1)); renderStrip(); drawMonitor(); update(); return; }
+    cur = +c.dataset.i; renderStrip(); drawMonitor();
+  });
+  const am = $("#addMore"); if (am) am.onclick = () => $("#picker").click();
+}
+function drawMonitor(){
+  const cv = $("#mon"), box = monitor.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(box.width * dpr); cv.height = Math.round(box.height * dpr);
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,box.width,box.height);
+  const e = files[cur]; $("#legend").innerHTML = "";
+  if (!e) return;
+  const sw = e.w || 16, sh = e.h || 9, k = Math.min(box.width / sw, box.height / sh) * 0.94;
+  const W = sw*k, H = sh*k, X = (box.width-W)/2, Y = (box.height-H)/2;
+  if (e.img) g.drawImage(e.img, X, Y, W, H); else { g.fillStyle = "#1a1d22"; g.fillRect(X,Y,W,H); }
+  const src = sw/sh, keys = [...selected].filter(k => RATIOS[k] && Math.abs(RATIOS[k]-src) > 0.01);
+  g.font = "600 12px " + getComputedStyle(document.body).fontFamily; g.textBaseline = "top";
+  keys.forEach((key, i) => {
+    const r = RATIOS[key]; let w = W, h = H;
+    if (r < src) w = H * r; else h = W / r;
+    const x = X + (W-w)/2, y = Y + (H-h)/2;
+    g.save();
+    if (fit === "blur") g.setLineDash([6,5]);
+    g.strokeStyle = "rgba(255,210,63,.95)"; g.lineWidth = 1.5; g.strokeRect(x+.75, y+.75, w-1.5, h-1.5);
+    g.restore();
+    const label = (FORMATS.find(f => f.key===key) || {}).label || key;
+    const tx = r < src ? x + 6 : x + 6 + i * 0, ty = r < src ? y + 6 + i*18 : y + 6;
+    g.fillStyle = "rgba(18,20,24,.7)"; const tw = g.measureText(label).width;
+    g.fillRect(tx-4, ty-2, tw+8, 17); g.fillStyle = "#ffd23f"; g.fillText(label, tx, ty);
+  });
+  if (keys.length) $("#legend").innerHTML = fit === "blur"
+    ? `<span><i class="dash"></i>Çizgilerin dışı bulanık dolguyla tamamlanır</span>`
+    : `<span><i></i>${fit === "track" ? "Kadraj boyutu; konum özneyle birlikte kayar" : "Çizgilerin dışı kesilir"}</span>`;
+}
+window.addEventListener("resize", drawMonitor);
+
+function update(){
+  const ok = files.length && selected.size;
+  $("#go").disabled = !ok;
+  const n = files.length * selected.size;
+  $("#sum").textContent = !files.length ? "Önce video ekle." : !selected.size ? "En az bir format seç." :
+    `${files.length} video × ${selected.size} format: ${n} teslim dosyası` + ($("#preview").checked ? ` ve ${n} önizleme` : "");
+}
+["#preview","#letterbox","#res","#lufs"].forEach(s => $(s).addEventListener("change", update));
+
+// ---------- çalıştır
+function showProg(on){ $("#ready").style.display = on ? "none" : ""; $("#prog").style.display = on ? "block" : "none"; }
+$("#go").onclick = async () => {
+  rememberLast(); showProg(true); $("#doneActs").style.display = "none";
+  $("#progTitle").textContent = "Dosyalar aktarılıyor"; $("#progText").className = "s"; $("#progPct").textContent = "";
+  try {
+    jobId = (await (await fetch("/new",{method:"POST"})).json()).job;
+    for (let i=0;i<files.length;i++){
+      $("#progText").textContent = files[i].file.name; $("#barFill").style.width = `${(i/files.length)*100}%`;
+      const r = await fetch(`/upload?job=${jobId}&name=${encodeURIComponent(files[i].file.name)}`,{method:"POST",body:files[i].file});
+      if (!r.ok) throw new Error("Aktarılamadı: " + files[i].file.name);
+    }
+    if ($("#preview").checked) {
+      $("#progTitle").textContent = "Filigran hazırlanıyor";
+      const plan = await (await fetch("/plan",{method:"POST",body:JSON.stringify({job: jobId, formats:[...selected], res: $("#res").value, letterbox: $("#letterbox").checked})})).json();
+      const text = ($("#watermark").value || $("#client").value || "ÖNİZLEME").trim().slice(0,24);
+      for (const [w,h] of plan.sizes || []) await fetch(`/upload_wm?job=${jobId}&w=${w}&h=${h}`, {method:"POST", body: await makeWatermark(w,h,text)});
+    }
+    await fetch("/start",{method:"POST",body:JSON.stringify({job: jobId, client: $("#client").value, project: $("#project").value,
+      version: $("#version").value, ...current()})});
+    $("#progTitle").textContent = "İşleniyor"; poll();
+  } catch(err) { showError(err.message); }
+};
+async function poll(){
+  let j; try { j = await (await fetch(`/status?job=${jobId}`)).json(); } catch(e) { return setTimeout(poll, 1000); }
+  const total = Math.max(1, j.total || 1), pct = Math.min(100, ((j.done||0) + (j.step_pct||0)/100) / total * 100);
+  $("#barFill").style.width = (j.status==="bitti" ? 100 : pct) + "%";
+  $("#progPct").textContent = j.status==="bitti" ? "" : `%${Math.round(pct)}`;
+  $("#progText").textContent = j.current || "";
+  if (j.status === "bitti"){
+    $("#progTitle").innerHTML = '<span class="done">Paket hazır</span>';
+    $("#progText").textContent = (j.out_dir || "").replace(/^\/Users\/[^/]+|^C:\\Users\\[^\\]+/i, "~");
+    $("#doneActs").style.display = "flex"; fetch(`/open?job=${jobId}`,{method:"POST"}); return;
+  }
+  if (j.status === "hata") return showError(j.error);
+  setTimeout(poll, 700);
+}
+function showError(msg){
+  $("#progTitle").textContent = "Paket hazırlanamadı"; $("#progText").className = "err"; $("#progText").textContent = msg;
+  $("#doneActs").style.display = "flex"; $("#openBtn").style.display = "none";
+}
+$("#openBtn").onclick = () => fetch(`/open?job=${jobId}`,{method:"POST"});
+$("#againBtn").onclick = () => { files = []; cur = 0; $("#openBtn").style.display = ""; showProg(false); renderStrip(); drawMonitor(); update(); };
+$("#quit").onclick = async () => {
+  try { await fetch("/quit",{method:"POST"}); } catch(e) {}
+  document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;color:#9aa1ad;font:15px var(--ui)">Teslim Paketi kapatıldı. Bu sekmeyi kapatabilirsin.</div>';
+};
+
+// Önizleme filigranı: şeffaf PNG, tuğla düzeninde yazılar ve ortada ÖNİZLEME
+function makeWatermark(w, h, text){
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+  const FONT = '700 {s}px -apple-system, "SF Pro Display", "Segoe UI", Arial, sans-serif';
+  const fitS = (str, maxW, maxS) => { let s = maxS; g.font = FONT.replace("{s}", s); const mw = g.measureText(str).width;
+    if (mw > maxW) s = Math.max(8, Math.floor(s * maxW / mw)); return s; };
+  g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+  const s = fitS(text, (w / 3) * 0.82, h / 22); g.font = FONT.replace("{s}", s); g.lineWidth = Math.max(1, s / 14);
+  g.strokeStyle = "rgba(0,0,0,0.20)"; g.fillStyle = "rgba(255,255,255,0.30)";
+  for (let r = 0; r < 6; r++) { const xs = r % 2 === 0 ? [1/6, 3/6, 5/6] : [1/3, 2/3]; const y = h * (r + 0.5) / 6;
+    for (const fx of xs) { g.strokeText(text, w * fx, y); g.fillText(text, w * fx, y); } }
+  const big = "ÖNİZLEME", bs = fitS(big, w * 0.8, h / 6); g.font = FONT.replace("{s}", bs); g.lineWidth = Math.max(2, bs / 18);
+  g.strokeStyle = "rgba(0,0,0,0.22)"; g.fillStyle = "rgba(255,255,255,0.35)"; g.strokeText(big, w/2, h/2); g.fillText(big, w/2, h/2);
+  return new Promise(res => c.toBlob(res, "image/png"));
+}
+
+// ---------- canlı tutma: sekme açık olduğu sürece uygulama çalışır
+setInterval(() => fetch("/ping").catch(() => {}), 20000);
+
+// ---------- başlangıç
+(async () => {
+  await loadPrefs();
+  const info = await (await fetch("/info")).json();
+  FORMATS = info.formats || []; folders = info.folders || [];
+  $("#ver").textContent = "v" + info.version;
+  if (!info.ffmpeg) { $("#ffWarn").style.display = "block"; $("#health").innerHTML = '<span class="dot bad"></span><span>ffmpeg eksik</span>'; }
+  else $("#health").innerHTML = `<span class="dot"></span><span>Hazır</span>`;
+  outRoot = info.out; renderChips(); renderProfiles();
+  if (prefs.last) { apply(prefs.last); if (prefs.last.client) $("#client").value = prefs.last.client; }
+  else { setFit("blur"); renderFolders(); }
+  renderFolders(); renderStrip(); update();
+})();
+</script>
+</body>
+</html>
