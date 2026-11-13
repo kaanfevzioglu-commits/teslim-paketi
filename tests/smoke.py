@@ -52,7 +52,7 @@ ff("-f", "lavfi", "-i", "testsrc=s=1280x720:r=24:d=3", "-f", "lavfi", "-i", "sin
 (TMP / "l.txt").write_text(f"file '{(TMP / 'p1.mp4').as_posix()}'\nfile '{(TMP / 'p2.mp4').as_posix()}'\n")
 ff("-f", "concat", "-safe", "0", "-i", str(TMP / "l.txt"), "-c", "copy", str(src / "Karışık Teaser.mp4"))
 # 2) uzun ve sürekli hareket eden video (Windows komut uzunluğu sınırı testi)
-ff("-f", "lavfi", "-i", "gradients=s=1920x1080:d=30:speed=0.0001", "-f", "lavfi",
+ff("-f", "lavfi", "-i", "color=c=0x203a4c:s=1920x1080:d=30", "-f", "lavfi",
    "-i", "color=c=0xff9620:s=220x220:d=30",
    "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
    "-filter_complex", "[0][1]overlay=x='80+(1920-380)*(0.5-0.5*cos(t*2*PI/9))':y=430:shortest=1,format=yuv420p[v]",
