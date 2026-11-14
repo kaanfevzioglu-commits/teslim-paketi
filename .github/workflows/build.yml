@@ -116,6 +116,7 @@ jobs:
           name: Teslim Paketi ${{ env.VER }}
           target_commitish: ${{ github.sha }}
           make_latest: "true"
+          body_path: packaging/KURULUM.md
           fail_on_unmatched_files: false
           files: |
             paket/TeslimPaketi-Windows/*
