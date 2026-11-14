@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 330" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3f57"/><stop offset=".62" stop-color="#c98a5b"/><stop offset=".63" stop-color="#3a3530"/><stop offset="1" stop-color="#1f1c1a"/></linearGradient>
+    <filter id="b"><feGaussianBlur stdDeviation="7"/></filter>
+    <clipPath id="c1"><rect x="95" y="30" width="130" height="231" rx="8"/></clipPath>
+    <clipPath id="c2"><rect x="375" y="30" width="130" height="231" rx="8"/></clipPath>
+    <clipPath id="c3"><rect x="655" y="30" width="130" height="231" rx="8"/></clipPath>
+    <g id="scene">
+      <rect x="0" y="0" width="411" height="231" fill="url(#s)"/>
+      <circle cx="300" cy="105" r="22" fill="#f2c27d"/>
+      <g fill="#16130f"><circle cx="0" cy="0" r="0"/></g>
+    </g>
+    <g id="person" fill="#16130f"><circle cx="0" cy="-48" r="11"/><ellipse cx="0" cy="-22" rx="14" ry="16"/><path d="M-20 40 q20 -70 40 0z"/></g>
+  </defs>
+  <rect width="880" height="330" rx="14" fill="#141619"/>
+  <!-- blur -->
+  <g clip-path="url(#c1)">
+    <use href="#scene" transform="translate(-45 0)" filter="url(#b)" opacity=".85"/>
+    <g transform="translate(95 103) scale(.3163)"><use href="#scene"/><use href="#person" transform="translate(130 210) scale(2.2)"/></g>
+  </g>
+  <!-- crop -->
+  <g clip-path="url(#c2)"><use href="#scene" transform="translate(234 30)"/><use href="#person" transform="translate(381 220)"/></g>
+  <!-- track -->
+  <g clip-path="url(#c3)"><use href="#scene" transform="translate(600 30)"/><use href="#person" transform="translate(720 220)"/></g>
+  <g fill="none" stroke="#ffffff" stroke-opacity=".3"><rect x="95" y="30" width="130" height="231" rx="8"/><rect x="375" y="30" width="130" height="231" rx="8"/><rect x="655" y="30" width="130" height="231" rx="8"/></g>
+  <rect x="690" y="150" width="60" height="96" fill="none" stroke="#ffd23f" stroke-width="2" stroke-dasharray="5 4" rx="4"/>
+  <g text-anchor="middle" fill="#e9ecef" font-size="16" font-weight="600">
+    <text x="160" y="292">Bulanık dolgu</text><text x="440" y="292">Ortadan kırp</text><text x="720" y="292">Akıllı takip</text>
+  </g>
+  <g text-anchor="middle" fill="#9aa3ad" font-size="12.5">
+    <text x="160" y="312">Hiçbir şey kesilmez</text><text x="440" y="312">Kadraj dolar, özne kaçabilir</text><text x="720" y="312">Özne hep kadrajda</text>
+  </g>
+</svg>

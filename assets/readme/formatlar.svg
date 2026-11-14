@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 420" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3f57"/><stop offset=".62" stop-color="#c98a5b"/><stop offset=".63" stop-color="#3a3530"/><stop offset="1" stop-color="#1f1c1a"/></linearGradient>
+    <clipPath id="f"><rect x="60" y="40" width="640" height="360" rx="6"/></clipPath>
+  </defs>
+  <rect width="880" height="420" rx="14" fill="#141619"/>
+  <g clip-path="url(#f)">
+    <rect x="60" y="40" width="640" height="360" fill="url(#sky)"/>
+    <circle cx="520" cy="190" r="34" fill="#f2c27d" opacity=".9"/>
+    <g fill="#16130f"><ellipse cx="300" cy="300" rx="20" ry="22"/><path d="M270 400 q30 -100 60 0z"/><circle cx="300" cy="262" r="16"/></g>
+  </g>
+  <rect x="60" y="40" width="640" height="360" rx="6" fill="none" stroke="#ffffff" stroke-opacity=".25"/>
+  <!-- 2.39 -->
+  <rect x="60" y="86" width="640" height="268" fill="none" stroke="#5aa9ff" stroke-width="2.5"/>
+  <!-- 4:5 -->
+  <rect x="156" y="40" width="288" height="360" fill="none" stroke="#ff6fb1" stroke-width="2.5"/>
+  <!-- 9:16 -->
+  <rect x="199" y="40" width="202" height="360" fill="none" stroke="#ffd23f" stroke-width="3"/>
+  <g font-size="15" fill="#e9ecef">
+    <rect x="726" y="120" width="14" height="4" fill="#ffd23f"/><text x="748" y="127">9:16  Reels</text>
+    <rect x="726" y="160" width="14" height="4" fill="#ff6fb1"/><text x="748" y="167">4:5  Akış</text>
+    <rect x="726" y="200" width="14" height="4" fill="#5aa9ff"/><text x="748" y="207">2.39  Scope</text>
+    <text x="726" y="260" font-size="13" fill="#9aa3ad">Kaynak: 16:9</text>
+    <text x="726" y="280" font-size="13" fill="#9aa3ad">Tek video,</text>
+    <text x="726" y="298" font-size="13" fill="#9aa3ad">her formatın</text>
+    <text x="726" y="316" font-size="13" fill="#9aa3ad">kadrajı monitörde</text>
+  </g>
+</svg>
