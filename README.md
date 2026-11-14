@@ -51,6 +51,13 @@ Hepsini aynı anda seçebilirsin.
 
 **Çözünürlük:** 720p, 1080p veya 4K. Sinema formatlarında istersen siyah bant (letterbox) ekleyebilirsin.
 
+**Dosya türü:**
+- **MP4 (H.264):** Instagram, YouTube, WhatsApp ve müşteri ekranı gibi her yerde açılır.
+- **MOV (ProRes 422 HQ, 10 bit):** Kurguda veya renkte çalışmaya devam edeceğin dosyalar için.
+- **İkisi birden:** Takip bir kez hesaplanır, MP4 de ProRes'ten üretilir.
+
+**Desteklenen girdiler:** MOV (ProRes, H.264, HEVC), MP4, MXF (DNxHD/DNxHR), MTS/M2TS, MKV, WebM, AVI ve diğerleri.
+
 ## Farklı orana nasıl yerleşsin?
 
 Yatay bir videoyu dikeye çevirirken kadrajın dışında kalan kısım için üç seçenek var:

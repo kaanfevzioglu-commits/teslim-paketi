@@ -29,7 +29,7 @@ sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
 import gorus  # noqa: E402
 
-VERSION = "2.2.1"
+VERSION = "2.3.0"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
@@ -465,6 +465,9 @@ def process_job(job_id, settings):
         letterbox = bool(settings.get("letterbox", False))
         lufs = float(settings.get("lufs", -14))
         make_preview = bool(settings.get("preview", False))
+        codec = settings.get("codec", "mp4")
+        if codec not in ("mp4", "prores", "both"):
+            codec = "mp4"
         wm_text = settings.get("watermark") or "ONIZLEME"
 
         root = Path(settings.get("out_root") or OUTPUT_ROOT).expanduser()
@@ -475,7 +478,7 @@ def process_job(job_id, settings):
                 raise RuntimeError(f"Kayıt klasörü bulunamadı: {root}")
         out_dir = root / f"{client}_{project}_{date}"
         k = 2
-        while out_dir.exists() and any(out_dir.glob("*.mp4")) and settings.get("new_folder", True):
+        while out_dir.exists() and (any(out_dir.glob("*.mp4")) or any(out_dir.glob("*.mov"))) and settings.get("new_folder", True):
             out_dir = root / f"{client}_{project}_{date}_{k}"
             k += 1
         # Klasörde sadece teslim dosyaları olur; önizleme istenirse ayrı alt klasöre gider.
@@ -494,7 +497,7 @@ def process_job(job_id, settings):
             job["current"] = "Görüntü motoru kontrol ediliyor"
             use_sub = subpixel_ok()
 
-        per_src = len(fmts) * (2 if make_preview else 1) + 1
+        per_src = len(fmts) * (1 + (codec == "both") + make_preview) + 1
         job["total"] = len(sources) * per_src
         report = [f"TESLİM RAPORU — {settings.get('client','')} / {settings.get('project','')}",
                   f"Tarih: {datetime.now():%d.%m.%Y %H:%M}   Hedef ses: {lufs} LUFS   "
@@ -590,22 +593,38 @@ def process_job(job_id, settings):
                 else:
                     graph = graph.replace("[v0]", "[v]")
 
-                name = f"{project}_{stem}_{label}_v{version:02d}.mp4"
+                ext = ".mov" if codec in ("prores", "both") else ".mp4"
+                name = f"{project}_{stem}_{label}_v{version:02d}{ext}"
                 if IS_WIN and len(str(final_dir / name)) > 230:   # Windows yol sınırı (260)
-                    name = f"{project[:12]}_{stem[:12]}_{label}_v{version:02d}.mp4"
+                    name = f"{project[:12]}_{stem[:12]}_{label}_v{version:02d}{ext}"
                 final_path = final_dir / name
                 cmd = ["-i", str(src)] + graph_args(graph, tmpdir, f"g_{stem}_{f}") + ["-map", "[v]"]
                 if info["audio"]:
                     cmd += ["-map", "0:a:0"]
                     if stats != "sessiz":
                         cmd += ["-af", audio_filter(stats, lufs)]
-                    cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
-                cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-                        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(final_path)]
-                run_ffmpeg(cmd, job, dur, f"{src.name} → {label} final")
+                    cmd += (["-c:a", "pcm_s24le"] if ext == ".mov" else ["-c:a", "aac", "-b:a", "192k"]) + ["-ar", "48000"]
+                if ext == ".mov":
+                    # ProRes 422 HQ, 10 bit: kurgu ve renk düzenlemeye devam etmek için
+                    cmd += ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0",
+                            "-pix_fmt", "yuv422p10le", "-movflags", "+write_colr", str(final_path)]
+                else:
+                    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(final_path)]
+                kind = "ProRes" if ext == ".mov" else "final"
+                run_ffmpeg(cmd, job, dur, f"{src.name} → {label} {kind}")
                 job["done"] += 1
                 report.append(f"  FINAL   {name}  ({ow}x{oh}){note}")
 
+                if codec == "both":
+                    # MP4, hazır ProRes'ten üretilir (takip ve filtreler ikinci kez çalışmaz)
+                    mname = final_path.with_suffix(".mp4").name
+                    mcmd = ["-i", str(final_path), "-map", "0:v", "-map", "0:a?",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(final_dir / mname)]
+                    run_ffmpeg(mcmd, job, dur, f"{src.name} → {label} final")
+                    job["done"] += 1
+                    report.append(f"  FINAL   {mname}  ({ow}x{oh})")
 
                 if make_preview:
                     pname = f"{project}_{stem}_{label}_ONIZLEME.mp4"

@@ -90,7 +90,8 @@ for fit in ("track", "blur"):
     t = time.time()
     adim(f"{fit} işi başlıyor")
     server.process_job(jid, {"client": "Test Müşteri", "project": f"duman {fit}", "fit": fit, "preview": True,
-                             "formats": fmts, "letterbox": fit == "blur"})
+                             "formats": fmts, "letterbox": fit == "blur",
+                             "codec": "both" if fit == "blur" else "mp4"})
     job = server.JOBS[jid]
     print(f"\n== {fit}: {job['status']} ({time.time() - t:.0f} sn)")
     if job["status"] != "bitti":
@@ -98,11 +99,17 @@ for fit in ("track", "blur"):
         failed = True
         continue
     rapor = job.get("report", "")
-    extra = [p.name for p in Path(job["out_dir"]).iterdir() if p.is_file() and p.suffix != ".mp4"]
+    extra = [p.name for p in Path(job["out_dir"]).iterdir() if p.is_file() and p.suffix not in (".mp4", ".mov")]
     if extra:
         print("HATA: teslim klasöründe video dışı dosya var:", extra)
         failed = True
     print(rapor)
+    if fit == "blur":
+        movs = list(Path(job["out_dir"]).glob("*.mov"))
+        pr = server.probe(movs[0])["video"] if movs else {}
+        if len(movs) != 4 or pr.get("codec_name") != "prores":
+            print("HATA: ProRes çıktısı eksik veya hatalı:", [m.name for m in movs], pr.get("codec_name"))
+            failed = True
     if fit == "track" and "FİLİGRANSIZ" in rapor:
         print("HATA: önizleme filigranı uygulanmadı")
         failed = True

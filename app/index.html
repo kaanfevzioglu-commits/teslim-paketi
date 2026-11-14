@@ -198,6 +198,15 @@
               <option value="2160">4K, büyük ekran ve sinema</option>
             </select>
           </div>
+          <div class="fld" style="margin-top:12px">
+            <label for="codec">Dosya türü</label>
+            <select id="codec">
+              <option value="mp4" selected>MP4 (H.264), her yerde açılır</option>
+              <option value="prores">MOV (ProRes 422 HQ), kurgu ve renk için</option>
+              <option value="both">İkisi birden, MP4 ve ProRes</option>
+            </select>
+          </div>
+          <p class="note" id="codecNote" hidden>ProRes dosyaları büyüktür: 1080p'de dakikası yaklaşık 1,3 GB, 4K'da yaklaşık 5 GB.</p>
         </div>
 
         <div class="step">
@@ -276,14 +285,14 @@ async function loadPrefs(){ try{ prefs = await (await fetch("/prefs")).json(); }
 function savePrefs(){ fetch("/prefs",{method:"POST",body:JSON.stringify(prefs)}); }
 function current(){
   return { watermark: $("#watermark").value, formats:[...selected], fit, lufs: $("#lufs").value,
-           preview: $("#preview").checked, res: $("#res").value, letterbox: $("#letterbox").checked, out_root: outRoot };
+           preview: $("#preview").checked, res: $("#res").value, codec: $("#codec").value, letterbox: $("#letterbox").checked, out_root: outRoot };
 }
 function apply(p, withFormats = true){
   if (!p) return;
   if (p.watermark !== undefined) $("#watermark").value = p.watermark;
   if (withFormats && p.formats){ selected.clear(); p.formats.forEach(f => selected.add(f)); }
   setFit(p.fit || "blur"); $("#lufs").value = p.lufs || "-14"; $("#preview").checked = !!p.preview;
-  $("#res").value = p.res || "1080"; $("#letterbox").checked = !!p.letterbox;
+  $("#res").value = p.res || "1080"; $("#codec").value = p.codec || "mp4"; $("#codecNote").hidden = $("#codec").value === "mp4"; $("#letterbox").checked = !!p.letterbox;
   if (p.out_root) setOut(p.out_root);
   renderChips(); update(); drawMonitor();
 }
@@ -470,9 +479,10 @@ function update(){
   $("#go").disabled = !ok;
   const n = files.length * selected.size;
   $("#sum").textContent = !files.length ? "Önce video ekle." : !selected.size ? "En az bir format seç." :
-    `${files.length} video × ${selected.size} format: ${n} teslim dosyası` + ($("#preview").checked ? ` ve ${n} önizleme` : "");
+    `${files.length} video × ${selected.size} format: ${$("#codec").value === "both" ? n*2 : n} teslim dosyası` + ($("#preview").checked ? ` ve ${n} önizleme` : "");
 }
-["#preview","#letterbox","#res","#lufs"].forEach(s => $(s).addEventListener("change", update));
+["#preview","#letterbox","#res","#lufs","#codec"].forEach(s => $(s).addEventListener("change", update));
+$("#codec").addEventListener("change", () => { $("#codecNote").hidden = $("#codec").value === "mp4"; });
 
 // ---------- çalıştır
 function showProg(on){ $("#ready").style.display = on ? "none" : ""; $("#prog").style.display = on ? "block" : "none"; }
