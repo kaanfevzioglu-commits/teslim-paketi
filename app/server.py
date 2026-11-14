@@ -3,6 +3,7 @@
 
 Sadece Python standart kütüphanesi kullanır. Dosyalar bilgisayardan çıkmaz.
 """
+import base64
 import json
 import os
 import re
@@ -28,7 +29,7 @@ sys.path.insert(0, str(APP_DIR))
 import takip  # noqa: E402
 import gorus  # noqa: E402
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 PORT = int(os.environ.get("TESLIM_PORT", "8765"))
 IS_MAC, IS_WIN = sys.platform == "darwin", os.name == "nt"
 HOME = Path.home()
@@ -148,6 +149,25 @@ def display_size(v):
             except ValueError:
                 pass
     return (h, w) if abs(rot) % 180 == 90 else (w, h)
+
+
+
+def server_thumb(path):
+    """Tarayıcının çözemediği videolar (ProRes, HEVC, eski bilgisayar...) için
+    ffmpeg ile önizleme karesi ve boyut bilgisi üretir."""
+    info = probe(path)
+    v = info["video"]
+    if not v:
+        return {"error": "Dosyada görüntü bulunamadı."}
+    w, h = display_size(v)
+    dur = info["duration"]
+    out = subprocess.run(
+        [FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{max(0.0, dur * 0.4):.2f}", "-i", str(path),
+         "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-f", "image2", "-c:v", "mjpeg", "-q:v", "4", "pipe:1"],
+        capture_output=True, timeout=60,
+    )
+    jpg = base64.b64encode(out.stdout).decode() if out.stdout else ""
+    return {"w": w, "h": h, "dur": dur, "jpg": jpg}
 
 
 def frame_rate(v):
@@ -700,6 +720,28 @@ class Handler(BaseHTTPRequestHandler):
                     fh.write(chunk)
                     remaining -= len(chunk)
             self._json({"ok": True})
+        elif u.path == "/thumb":
+            name = Path(q.get("name", ["dosya"])[0]).name
+            tdir = WORK_ROOT / "_onizleme"
+            tdir.mkdir(parents=True, exist_ok=True)
+            tmp = tdir / (uuid.uuid4().hex[:8] + "_" + name)
+            remaining = length
+            try:
+                with open(tmp, "wb") as fh:
+                    while remaining > 0:
+                        chunk = self.rfile.read(min(4 << 20, remaining))
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        remaining -= len(chunk)
+                self._json(server_thumb(tmp))
+            except Exception as e:  # noqa: BLE001
+                self._json({"error": str(e)})
+            finally:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
         elif u.path == "/plan":
             body = json.loads(self.rfile.read(length) or b"{}")
             jid = body.get("job")

@@ -60,6 +60,9 @@ ff("-f", "lavfi", "-i", "color=c=0x203a4c:s=1920x1080:d=30", "-f", "lavfi",
    str(src / "uzun hareketli (sessiz ses).mp4"))
 
 adim("test videoları hazır")
+_t = server.server_thumb(src / "Karışık Teaser.mp4")
+assert _t.get("w") == 1920 and len(_t.get("jpg", "")) > 1000, _t.get("error")
+adim("sunucu önizleme karesi tamam")
 failed = False
 for fit in ("track", "blur"):
     jid = "smoke_" + fit

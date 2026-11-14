@@ -357,17 +357,47 @@ document.addEventListener("drop", e => { monitor.classList.remove("over"); if (e
 
 function tc(sec){ if (!isFinite(sec)) return ""; const m = Math.floor(sec/60), s = sec - m*60; return `${m}:${s.toFixed(1).padStart(4,"0")}`; }
 function thumb(entry){
+  // Önce tarayıcı dener; çözemezse (ProRes, HEVC, eski bilgisayar, Firefox...) kareyi ffmpeg çıkarır.
   const v = document.createElement("video"); v.muted = true; v.preload = "metadata"; v.src = URL.createObjectURL(entry.file);
-  v.onloadedmetadata = () => { entry.w = v.videoWidth; entry.h = v.videoHeight; entry.dur = v.duration;
+  let finished = false;
+  const fallback = () => { if (finished) return; finished = true; URL.revokeObjectURL(v.src); v.removeAttribute("src"); serverThumb(entry); };
+  const timer = setTimeout(fallback, 8000);
+  v.onloadedmetadata = () => {
+    if (!v.videoWidth) return fallback();          // ses çözülüyor ama görüntü çözülemiyor
+    entry.w = v.videoWidth; entry.h = v.videoHeight; entry.dur = v.duration;
     v.currentTime = Math.min(Math.max(0.1, v.duration * 0.4), v.duration || 0); renderStrip(); drawMonitor(); };
   v.onseeked = () => {
+    if (finished) return;
     const c = document.createElement("canvas"); const s = Math.min(1, 960 / (v.videoWidth || 960));
     c.width = Math.round((v.videoWidth||960) * s); c.height = Math.round((v.videoHeight||540) * s);
-    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    const g = c.getContext("2d"); g.drawImage(v, 0, 0, c.width, c.height);
+    if (isBlank(g, c.width, c.height)) return fallback();   // kare siyah/boş geldiyse
+    finished = true; clearTimeout(timer);
     entry.img = c; entry.url = c.toDataURL("image/jpeg", .8); URL.revokeObjectURL(v.src);
     renderStrip(); drawMonitor();
   };
-  v.onerror = () => { entry.noThumb = true; renderStrip(); };
+  v.onerror = () => { clearTimeout(timer); fallback(); };
+}
+function isBlank(g, w, h){
+  try { const d = g.getImageData(0, 0, w, h).data; let m = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) m = Math.max(m, d[i], d[i+1], d[i+2]);
+    return m < 6; } catch { return false; }
+}
+async function serverThumb(entry){
+  entry.loadingThumb = true; renderStrip();
+  try {
+    const r = await (await fetch(`/thumb?name=${encodeURIComponent(entry.file.name)}`, {method:"POST", body: entry.file})).json();
+    if (r.w) { entry.w = r.w; entry.h = r.h; entry.dur = r.dur; }
+    if (r.jpg) {
+      const img = new Image();
+      img.onload = () => { const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext("2d").drawImage(img, 0, 0); entry.img = c; entry.url = img.src; entry.loadingThumb = false; renderStrip(); drawMonitor(); };
+      img.src = "data:image/jpeg;base64," + r.jpg;
+      return;
+    }
+    entry.noThumb = true;
+  } catch { entry.noThumb = true; }
+  entry.loadingThumb = false; renderStrip(); drawMonitor();
 }
 function addFiles(list){
   for (const f of list) if (!files.some(x => x.file.name===f.name && x.file.size===f.size)) { const e = {file:f}; files.push(e); thumb(e); }
@@ -398,7 +428,9 @@ function drawMonitor(){
   if (!e) return;
   const sw = e.w || 16, sh = e.h || 9, k = Math.min(box.width / sw, box.height / sh) * 0.94;
   const W = sw*k, H = sh*k, X = (box.width-W)/2, Y = (box.height-H)/2;
-  if (e.img) g.drawImage(e.img, X, Y, W, H); else { g.fillStyle = "#1a1d22"; g.fillRect(X,Y,W,H); }
+  if (e.img) g.drawImage(e.img, X, Y, W, H); else { g.fillStyle = "#1a1d22"; g.fillRect(X,Y,W,H);
+    g.fillStyle = "#8a929c"; g.font = "14px system-ui, sans-serif"; g.textAlign = "center";
+    g.fillText(e.loadingThumb ? "Önizleme hazırlanıyor…" : e.noThumb ? "Önizleme gösterilemiyor; dönüştürme yine çalışır." : "", X + W/2, Y + H/2); g.textAlign = "start"; }
   const src = sw/sh;
   // Sadece seçili ve kaynaktan farklı oranlı formatlar çizilir; sıra format listesindeki sırayla aynı
   const chosen = FORMATS.map(f => f.key).filter(key => selected.has(key) && RATIOS[key]);
